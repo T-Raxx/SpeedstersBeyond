@@ -6,7 +6,19 @@ return function(require, SB, Lib)
     local Jobs = {}
     local running = false
 
+    local JobsConfig = require(game:GetService("ReplicatedStorage").Modules.Config.JobsConfig)
     local function JC() return require(LP.PlayerScripts.Controllers.JobsController) end
+
+    -- Slots de chain disponibles por ascensión (CHAIN_SLOT_ASCENSIONS = {0,0,10,25}):
+    -- 2 slots (<asc10), 3 (asc10-24), 4 (asc25+).
+    function Jobs.AvailableSlots()
+        local asc = SB.Get("ascensions") or 0
+        local n = 0
+        for _, th in ipairs(JobsConfig.CHAIN_SLOT_ASCENSIONS or { 0, 0, 10, 25 }) do
+            if asc >= th then n = n + 1 end
+        end
+        return math.max(1, n)
+    end
     local function jobsPartPos()
         local p = workspace:FindFirstChild("JobsPart", true)
         return p and p.Position
@@ -78,29 +90,31 @@ return function(require, SB, Lib)
     -- Una vuelta: si banked>=claimAt claim; aceptar tier; correr chain hasta phase idle.
     function Jobs.RunCycle()
         local jc = JC()
-        if not gotoZone() then return "no-zone" end
-        if jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then
-            fire(claimButton()); task.wait(1)
-        end
-        Jobs.SetType(SB.jobsType or "Simple")
         local fragile = (SB.jobsType == "Fragile")
-        local btn = tierButton(Jobs.BestTier())
-        if not btn then return "tier-locked" end
-        fire(btn)
-        local t0 = os.clock()
-        while jc:GetPhase() == "idle" and os.clock() - t0 < 4 do task.wait(0.2) end
+        -- Si NO hay chain activo → ir a zona, claim si toca, y SELECCIONAR X jobs (llenar slots).
+        -- Si YA hay legs (chain en progreso, tiers "In Progress" locked) → saltar accept y correrlos.
+        if jc:GetLegCount() == 0 then
+            if not gotoZone() then return "no-zone" end
+            if jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then fire(claimButton()); task.wait(1) end
+            Jobs.SetType(SB.jobsType or "Simple")
+            local btn = tierButton(Jobs.BestTier())
+            if not btn then return "tier-locked" end
+            local want = math.min(Jobs.AvailableSlots(), SB.jobsBatch or 99)
+            local fills = 0
+            while jc:GetLegCount() < want and fills < want + 3 do
+                fire(btn); task.wait(0.35); fills = fills + 1   -- arranca apenas llenos (run al salir de zona)
+            end
+        end
+        -- correr el batch: GoTo cada drop hasta idle (arranca al salir de zona → phase running)
         local guard = 0
-        while not SB.IsStopped() and jc:GetPhase() ~= "idle" and guard < 12 do
+        while not SB.IsStopped() and jc:GetPhase() ~= "idle" and guard < 16 do
             local dp = jc:GetDropPoint()
             if typeof(dp) ~= "Vector3" then break end
-            -- Fragile = steady (control, no chocar props); Simple = modo elegido (fast por defecto)
-            SB.Move.GoTo(dp, { arrive = 15, timeout = 25, mode = fragile and "steady" or (SB.moveMode or "fast") })
-            task.wait(0.6)   -- banca + próximo leg
+            SB.Move.GoTo(dp, { arrive = 15, timeout = 30, mode = fragile and "steady" or (SB.moveMode or "fast") })
+            task.wait(0.5)   -- banca + próximo leg
             guard = guard + 1
         end
-        if jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then
-            gotoZone(); fire(claimButton()); task.wait(1)
-        end
+        if jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then gotoZone(); fire(claimButton()); task.wait(1) end
         return "cycle-done"
     end
 
