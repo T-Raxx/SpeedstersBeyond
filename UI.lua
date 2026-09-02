@@ -85,6 +85,9 @@ return function(require, SB, Lib)
         econ:AddToggle("QuestsOn", { Text = "Auto-Quests", Default = true,
             Tooltip = "Colecta quests completadas (sin zona, en paralelo al farm).",
             Callback = function(v) SB.questsOn = v end })
+        econ:AddToggle("RewardsOn", { Text = "Auto-Rewards (PlayTime)", Default = true,
+            Tooltip = "Claim PlayTime rewards al desbloquearse. FreeRewards NO (requiere like/group).",
+            Callback = function(v) SB.rewardsOn = v end })
     end
 
     return UI
