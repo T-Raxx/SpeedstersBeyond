@@ -16,6 +16,8 @@ return function(require, SB, _Lib)
     SB.ThemeManager = ThemeManager
     SB.SaveManager  = SaveManager
 
+    SB.Governor = require("Safety.Governor")
+
     local Window = Library:CreateWindow({
         Title = "SpeedstersBeyond",
         Footer = "v" .. SB.version .. " · burner",
