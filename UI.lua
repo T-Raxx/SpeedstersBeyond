@@ -71,6 +71,10 @@ return function(require, SB, Lib)
             Callback = function(v) SB.jobsType = v end })
         farm:AddSlider("JobsClaimAt", { Text = "Claim at", Min = 1, Max = 50, Default = 40, Rounding = 0,
             Callback = function(v) SB.jobsClaimAt = v end })
+        farm:AddSlider("JobsSelectDelay", { Text = "Select delay", Min = 0.1, Max = 1, Default = 0.58,
+            Rounding = 2, Suffix = "s",
+            Tooltip = "Delay entre selección de jobs. 0.58s ≈ 1.7/s (máx confiable con lag). Menor = más rápido pero puede dropear fires.",
+            Callback = function(v) SB.jobsSelectDelay = v end })
         farm:AddDropdown("TreadmillPad", { Values = { "auto", "x2", "x3", "x4", "x6", "x10" }, Default = "auto",
             Text = "Treadmill pad", Callback = function(v) SB.treadmillPad = v end })
         farm:AddToggle("AscendAuto", { Text = "Auto-Ascend", Default = true,

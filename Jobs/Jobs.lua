@@ -101,8 +101,10 @@ return function(require, SB, Lib)
             if not btn then return "tier-locked" end
             local want = math.min(Jobs.AvailableSlots(), SB.jobsBatch or 99)
             local fills = 0
-            while jc:GetLegCount() < want and fills < want + 3 do
-                fire(btn); task.wait(0.35); fills = fills + 1   -- arranca apenas llenos (run al salir de zona)
+            -- Selección a ~1.7/s (máx confiable con lag; más rápido dropea fires → slots sin llenar).
+            -- Tunable por SB.jobsSelectDelay (slider). Confirma por GetLegCount, no por # de fires.
+            while jc:GetLegCount() < want and fills < want + 5 do
+                fire(btn); task.wait(SB.jobsSelectDelay or 0.58); fills = fills + 1
             end
         end
         -- correr el batch: GoTo cada drop hasta idle (arranca al salir de zona → phase running)
@@ -111,7 +113,7 @@ return function(require, SB, Lib)
             local dp = jc:GetDropPoint()
             if typeof(dp) ~= "Vector3" then break end
             SB.Move.GoTo(dp, { arrive = 15, timeout = 30, mode = fragile and "steady" or (SB.moveMode or "fast") })
-            task.wait(0.5)   -- banca + próximo leg
+            task.wait(0.15)   -- banca + próximo leg (snappy; FPS drops OK)
             guard = guard + 1
         end
         if jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then gotoZone(); fire(claimButton()); task.wait(1) end
@@ -127,9 +129,9 @@ return function(require, SB, Lib)
                     local ok, err = pcall(Jobs.RunCycle)
                     if not ok then SB.Log(1, "Jobs cycle err:", err) end
                 else
-                    task.wait(0.5)
+                    task.wait(0.2)
                 end
-                task.wait(0.3)
+                task.wait(0.05)
             end
         end)
         SB.Log(2, "JobsFarm armado")
