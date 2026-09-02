@@ -52,6 +52,29 @@ return function(require, SB, Lib)
             Suffix = " s", Callback = function(v) if SB.AntiIdle then SB.AntiIdle.gapMin = v end end })
         ai:AddSlider("IdleGapMax", { Text = "gap max", Min = 30, Max = 55, Default = 45, Rounding = 0,
             Suffix = " s", Callback = function(v) if SB.AntiIdle then SB.AntiIdle.gapMax = v end end })
+
+        local farm = SB.Tabs.Main:AddLeftGroupbox("Farm")
+        farm:AddDropdown("FarmMode", { Values = { "Jobs", "Treadmill" }, Default = "Jobs", Text = "Mode",
+            Tooltip = "Jobs y Treadmill son exclusivos por posición.",
+            Callback = function(v)
+                SB.farmMode = v
+                SB.jobsOn = (v == "Jobs")
+                SB.treadmillOn = (v == "Treadmill")
+            end })
+        farm:AddDropdown("JobsTier", { Values = { "auto", "1", "2", "3" }, Default = "auto", Text = "Jobs tier",
+            Tooltip = "auto = mejor por ascensión (1=Easy,2=Med,3=Hard).",
+            Callback = function(v) SB.jobsTier = v end })
+        farm:AddDropdown("JobsType", { Values = { "Simple", "Fragile" }, Default = "Simple", Text = "Jobs type",
+            Tooltip = "Fragile = no chocar props (usa modo steady).",
+            Callback = function(v) SB.jobsType = v end })
+        farm:AddSlider("JobsClaimAt", { Text = "Claim at", Min = 1, Max = 50, Default = 40, Rounding = 0,
+            Callback = function(v) SB.jobsClaimAt = v end })
+        farm:AddDropdown("TreadmillPad", { Values = { "auto", "x2", "x3", "x4", "x6", "x10" }, Default = "auto",
+            Text = "Treadmill pad", Callback = function(v) SB.treadmillPad = v end })
+        farm:AddToggle("AscendAuto", { Text = "Auto-Ascend", Default = true,
+            Callback = function(v) SB.ascendAuto = v end })
+        farm:AddSlider("AscendTarget", { Text = "Ascend target (0=inf)", Min = 0, Max = 200, Default = 0,
+            Rounding = 0, Callback = function(v) SB.ascendTarget = v end })
     end
 
     return UI

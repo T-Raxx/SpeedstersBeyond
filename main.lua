@@ -58,6 +58,21 @@ return function(require, SB, _Lib)
         if T.AntiIdleOn and T.AntiIdleOn.Value then SB.AntiIdle.Start() end
     end
 
+    -- FARM: defaults desde flags + arrancar loops (guardados por masterOn/<x>On/ascending)
+    do
+        local T, O = Library.Toggles, Library.Options
+        SB.farmMode = O.FarmMode and O.FarmMode.Value or "Jobs"
+        SB.jobsOn = (SB.farmMode == "Jobs")
+        SB.treadmillOn = (SB.farmMode == "Treadmill")
+        SB.jobsTier = O.JobsTier and O.JobsTier.Value or "auto"
+        SB.jobsType = O.JobsType and O.JobsType.Value or "Simple"
+        SB.jobsClaimAt = O.JobsClaimAt and O.JobsClaimAt.Value or 40
+        SB.treadmillPad = O.TreadmillPad and O.TreadmillPad.Value or "auto"
+        SB.ascendAuto = T.AscendAuto and T.AscendAuto.Value
+        SB.ascendTarget = O.AscendTarget and O.AscendTarget.Value or 0
+    end
+    SB.Jobs.Start(); SB.Treadmill.Start(); SB.Ascension.Start()
+
     -- READ INICIAL + REFRESH (StateStore). Fuentes reales confirmadas live:
     --   GetCurrencySnapshot { points(money), speed(stat velocidad = techo budget), safeMode }
     --   GetStatsSnapshot     { level, goal, exp }
