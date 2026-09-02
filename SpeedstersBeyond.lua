@@ -604,8 +604,10 @@ return function(require, SB, Lib)
         })
         box:AddButton({ Text = "Unload", Func = function() SB.Unload() end })
         box:AddDivider()
+        -- Panic key = End (NO RightControl: ese es el toggle de menú de Obsidian → colisiona y
+        -- ocultar el menú unloadearía todo). El menú se oculta con RightControl (Obsidian) sin unload.
         box:AddLabel("Panic Key"):AddKeyPicker("PanicKey", {
-            Default = "RightControl", Mode = "Toggle", Text = "Panic (unload)",
+            Default = "End", Mode = "Toggle", Text = "Panic (unload)",
             Callback = function() SB.Unload() end,
         })
 
