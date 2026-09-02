@@ -123,8 +123,9 @@ return function(require, SB, Lib)
                     SB.Move.GoTo(wp, { arrive = 8, timeout = 20, mode = "steady", noFly = true })
                 end
             else
-                -- Simple: fast + vuelo (romper props no penaliza)
-                SB.Move.GoTo(dp, { arrive = 15, timeout = 30, mode = SB.moveMode or "fast" })
+                -- Simple: fast + vuelo + keepSpeed (no frenar en cada drop; entrar a 40 a full velocidad
+                -- ya dispara la arrival del juego a radio ~50 = máxima ganancia, sin desacelerar).
+                SB.Move.GoTo(dp, { arrive = 40, timeout = 30, mode = SB.moveMode or "fast", keepSpeed = true })
             end
             task.wait(0.15)   -- banca + próximo leg (snappy; FPS drops OK)
             guard = guard + 1

@@ -84,8 +84,10 @@ return function(require, SB, Lib)
                     budget = math.min(budget * (0.9 + rnd() * 0.25), ceil)   -- fluctuación (no-plana, empuja alto)
                 end
                 -- ANTI-OVERSHOOT: velocidad ∝ distancia al acercarse → frena y PARA en el target (a alta
-                -- velocidad, sin esto, pasa de largo el área de jobs / drop / waypoint por 8+ studs/frame).
-                budget = math.min(budget, math.max(FLOOR, dist * 4))
+                -- velocidad, sin esto, pasa de largo la zona jobs / waypoint). keepSpeed lo SALTEA →
+                -- mantiene velocidad full (Simple: la arrival del juego dispara a radio ~50, no hace falta
+                -- frenar en cada drop = más ganancia). Zona y fragile SÍ frenan (precisión).
+                if not opts.keepSpeed then budget = math.min(budget, math.max(FLOOR, dist * 4)) end
                 local dir = flat.Unit
                 -- Y: noFly = ground-hug (fragile, rodea props por A* — volar los rompe). Si no, VUELO a
                 -- altitud crucero (limpia terreno en rutas largas; el AC rubberbandea horizontal, no vertical).
