@@ -100,11 +100,12 @@ return function(require, SB, Lib)
             local btn = tierButton(Jobs.BestTier())
             if not btn then return "tier-locked" end
             local want = math.min(Jobs.AvailableSlots(), SB.jobsBatch or 99)
-            local fills = 0
-            -- Selección a ~1.7/s (máx confiable con lag; más rápido dropea fires → slots sin llenar).
-            -- Tunable por SB.jobsSelectDelay (slider). Confirma por GetLegCount, no por # de fires.
-            while jc:GetLegCount() < want and fills < want + 5 do
-                fire(btn); task.wait(SB.jobsSelectDelay or 0.58); fills = fills + 1
+            -- El botón se puede spammear sin problema; lo crítico es DETECTAR rápido que los slots están
+            -- llenos. Spam + poll GetLegCount cada tick (rápido) hasta llenar; guard por TIEMPO, no por
+            -- # de fires. jobsSelectDelay chico = spam rápido + detección inmediata.
+            local t0 = os.clock()
+            while jc:GetLegCount() < want and os.clock() - t0 < 3 and not SB.IsStopped() do
+                fire(btn); task.wait(SB.jobsSelectDelay or 0.05)
             end
         end
         -- correr el batch: GoTo cada drop hasta idle (arranca al salir de zona → phase running)

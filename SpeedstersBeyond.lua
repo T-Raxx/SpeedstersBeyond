@@ -378,11 +378,12 @@ return function(require, SB, Lib)
             local btn = tierButton(Jobs.BestTier())
             if not btn then return "tier-locked" end
             local want = math.min(Jobs.AvailableSlots(), SB.jobsBatch or 99)
-            local fills = 0
-            -- Selección a ~1.7/s (máx confiable con lag; más rápido dropea fires → slots sin llenar).
-            -- Tunable por SB.jobsSelectDelay (slider). Confirma por GetLegCount, no por # de fires.
-            while jc:GetLegCount() < want and fills < want + 5 do
-                fire(btn); task.wait(SB.jobsSelectDelay or 0.58); fills = fills + 1
+            -- El botón se puede spammear sin problema; lo crítico es DETECTAR rápido que los slots están
+            -- llenos. Spam + poll GetLegCount cada tick (rápido) hasta llenar; guard por TIEMPO, no por
+            -- # de fires. jobsSelectDelay chico = spam rápido + detección inmediata.
+            local t0 = os.clock()
+            while jc:GetLegCount() < want and os.clock() - t0 < 3 and not SB.IsStopped() do
+                fire(btn); task.wait(SB.jobsSelectDelay or 0.05)
             end
         end
         -- correr el batch: GoTo cada drop hasta idle (arranca al salir de zona → phase running)
@@ -831,9 +832,9 @@ return function(require, SB, Lib)
             Callback = function(v) SB.jobsType = v end })
         farm:AddSlider("JobsClaimAt", { Text = "Claim at", Min = 1, Max = 50, Default = 40, Rounding = 0,
             Callback = function(v) SB.jobsClaimAt = v end })
-        farm:AddSlider("JobsSelectDelay", { Text = "Select delay", Min = 0.1, Max = 1, Default = 0.58,
+        farm:AddSlider("JobsSelectDelay", { Text = "Select spam delay", Min = 0.01, Max = 0.5, Default = 0.05,
             Rounding = 2, Suffix = "s",
-            Tooltip = "Delay entre selección de jobs. 0.58s ≈ 1.7/s (máx confiable con lag). Menor = más rápido pero puede dropear fires.",
+            Tooltip = "Delay entre spams del botón (el spam es seguro). Bajo = llena slots + detecta lleno más rápido.",
             Callback = function(v) SB.jobsSelectDelay = v end })
         farm:AddDropdown("TreadmillPad", { Values = { "auto", "x2", "x3", "x4", "x6", "x10" }, Default = "auto",
             Text = "Treadmill pad", Callback = function(v) SB.treadmillPad = v end })
@@ -934,7 +935,7 @@ return function(require, SB, _Lib)
         SB.jobsTier = O.JobsTier and O.JobsTier.Value or "auto"
         SB.jobsType = O.JobsType and O.JobsType.Value or "Simple"
         SB.jobsClaimAt = O.JobsClaimAt and O.JobsClaimAt.Value or 40
-        SB.jobsSelectDelay = O.JobsSelectDelay and O.JobsSelectDelay.Value or 0.58
+        SB.jobsSelectDelay = O.JobsSelectDelay and O.JobsSelectDelay.Value or 0.05
         SB.treadmillPad = O.TreadmillPad and O.TreadmillPad.Value or "auto"
         SB.ascendAuto = T.AscendAuto and T.AscendAuto.Value
         SB.ascendTarget = O.AscendTarget and O.AscendTarget.Value or 0
