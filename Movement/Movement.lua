@@ -86,12 +86,16 @@ return function(require, SB, Lib)
                 local slow = (mode == "steady") and 40 or 22                 -- desaceleración cerca del target
                 if dist < slow then budget = math.max(FLOOR, budget * math.clamp(dist / slow, 0.35, 1)) end
                 local dir = flat.Unit
-                -- VUELO sobre terreno: sube a altitud crucero mientras viaja (limpia colinas/paredes que
-                -- atascaban el horizontal puro), desciende al target al acercarse. El AC rubberbandea horizontal,
-                -- no vertical → volar es seguro. Y proporcional (control suave), clamp.
-                local cruise = math.max(here.Y, pos.Y) + 28
-                local desiredY = (dist > (arrive + 15)) and cruise or pos.Y
-                local yVel = math.clamp((desiredY - here.Y) * 3, -90, 90)
+                -- Y: noFly = ground-hug (fragile, rodea props por A* — volar los rompe). Si no, VUELO a
+                -- altitud crucero (limpia terreno en rutas largas; el AC rubberbandea horizontal, no vertical).
+                local yVel
+                if opts.noFly then
+                    yVel = -20
+                else
+                    local cruise = math.max(here.Y, pos.Y) + 28
+                    local desiredY = (dist > (arrive + 15)) and cruise or pos.Y
+                    yVel = math.clamp((desiredY - here.Y) * 3, -90, 90)
+                end
                 lv.VectorVelocity = Vector3.new(dir.X * budget, yVel, dir.Z * budget)
                 if lastPos and (here - lastPos).Magnitude < 2 then
                     if os.clock() - stuckT > stuckSec then

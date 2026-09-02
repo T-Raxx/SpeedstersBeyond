@@ -113,7 +113,19 @@ return function(require, SB, Lib)
         while not SB.IsStopped() and jc:GetPhase() ~= "idle" and guard < 16 do
             local dp = jc:GetDropPoint()
             if typeof(dp) ~= "Vector3" then break end
-            SB.Move.GoTo(dp, { arrive = 15, timeout = 30, mode = fragile and "steady" or (SB.moveMode or "fast") })
+            if fragile and SB.Pathfind then
+                -- Fragile: A* rodea árboles a nivel de piso (volar/chocar los rompe → job falla).
+                local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+                local here = hrp and hrp.Position or dp
+                local wps = SB.Pathfind.FindPath(here, dp) or { dp }
+                for _, wp in ipairs(wps) do
+                    if SB.IsStopped() then break end
+                    SB.Move.GoTo(wp, { arrive = 8, timeout = 20, mode = "steady", noFly = true })
+                end
+            else
+                -- Simple: fast + vuelo (romper props no penaliza)
+                SB.Move.GoTo(dp, { arrive = 15, timeout = 30, mode = SB.moveMode or "fast" })
+            end
             task.wait(0.15)   -- banca + próximo leg (snappy; FPS drops OK)
             guard = guard + 1
         end
