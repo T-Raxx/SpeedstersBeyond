@@ -18,6 +18,7 @@ return function(require, SB, _Lib)
 
     SB.Governor = require("Safety.Governor")
     SB.Net = require("Net")
+    SB.Move = require("Movement.Movement")
 
     local Window = Library:CreateWindow({
         Title = "SpeedstersBeyond",
