@@ -334,6 +334,13 @@ return function(require, SB, Lib)
 
     local function gotoZone()
         local pos = jobsPartPos(); if not pos then return false end
+        -- si estamos lejos (fin de delivery a miles de studs) → ReturnToSpawn (teleport server-side
+        -- a spawn, ~53 studs de JobsPart) en vez del viaje largo de vuelta.
+        local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+        if hrp and (Vector3.new(hrp.Position.X - pos.X, 0, hrp.Position.Z - pos.Z)).Magnitude > 150 then
+            SB.Net.Fire("ReturnToSpawn")
+            task.wait(1)
+        end
         SB.Move.GoTo(pos, { arrive = 12, timeout = 15, mode = "fast" })
         SB.Move.Stop()
         task.wait(3.5)   -- dwell: server zone confirm = SERVER_STRIKES(3) x SERVER_INTERVAL(1s) ≈ 3s
