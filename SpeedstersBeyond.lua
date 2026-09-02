@@ -661,6 +661,55 @@ return function(require, SB, Lib)
 end
 
 end)()
+_MODS["Economy.Upgrades"] = (function()
+-- Economy/Upgrades.lua — FACTORY. Auto-buy upgrades (SpeedN/SpeedT/PointsB) — sube ranks si asequible.
+-- Sin zona (verificado: compra desde cualquier lado). El botón no-op si no alcanza → seguro spamear.
+-- Corre en paralelo al farm (no requiere posición). Drena points en upgrades (sinergia EXP/speed).
+return function(require, SB, Lib)
+    local LP = game:GetService("Players").LocalPlayer
+    local Upgrades = {}
+    local running = false
+    local TRACKS = { "MainFrameSpeedN", "MainFrameSpeedT", "MainFramePointsB" }
+
+    local function panel()
+        local u = LP.PlayerGui:FindFirstChild("Uis")
+        return u and u:FindFirstChild("Upgrades")
+    end
+    local function fire(btn)
+        if not btn then return end
+        for _, c in ipairs(getconnections(btn.Activated)) do pcall(function() c:Fire() end) end
+    end
+
+    function Upgrades.BuyAffordable(rounds)
+        local pnl = panel(); if not pnl then return end
+        for _ = 1, (rounds or 3) do
+            for _, name in ipairs(TRACKS) do
+                local f = pnl:FindFirstChild(name, true)
+                local ub = f and f:FindFirstChild("UpgradeButton")
+                local btn = ub and ub:FindFirstChild("Button")
+                fire(btn); task.wait(0.15)
+            end
+        end
+    end
+
+    function Upgrades.Start()
+        if running then return end
+        running = true
+        task.spawn(function()
+            while running and not SB.IsStopped() do
+                if SB.masterOn and SB.upgradesOn then pcall(function() Upgrades.BuyAffordable(3) end) end
+                task.wait(SB.upgradesInterval or 15)
+            end
+        end)
+        SB.Log(2, "Upgrades auto-buy armado")
+    end
+    function Upgrades.Stop() running = false end
+    SB.onCleanup(function() running = false end)
+
+    return Upgrades
+end
+
+end)()
 _MODS["Safety.Governor"] = (function()
 -- Safety/Governor.lua — FACTORY. RateGovernor: min-interval por remote + ventana ATTEMPT_LIMIT.
 -- Allow(name) devuelve true si se puede disparar AHORA (y registra el disparo); false = throttle.
@@ -797,6 +846,9 @@ return function(require, SB, Lib)
         econ:AddToggle("RewardsOn", { Text = "Auto-Rewards (PlayTime)", Default = true,
             Tooltip = "Claim PlayTime rewards al desbloquearse. FreeRewards NO (requiere like/group).",
             Callback = function(v) SB.rewardsOn = v end })
+        econ:AddToggle("UpgradesOn", { Text = "Auto-Upgrades", Default = true,
+            Tooltip = "Compra upgrades asequibles (Speed/Points) — drena points en boosts. Sin zona.",
+            Callback = function(v) SB.upgradesOn = v end })
     end
 
     return UI
@@ -831,6 +883,7 @@ return function(require, SB, _Lib)
     SB.Ascension = require("Ascension.Ascension")
     SB.Quests = require("Economy.Quests")
     SB.Rewards = require("Economy.Rewards")
+    SB.Upgrades = require("Economy.Upgrades")
 
     local Window = Library:CreateWindow({
         Title = "SpeedstersBeyond",
@@ -880,8 +933,9 @@ return function(require, SB, _Lib)
         SB.ascendTarget = O.AscendTarget and O.AscendTarget.Value or 0
         SB.questsOn = (T.QuestsOn == nil) and true or T.QuestsOn.Value
         SB.rewardsOn = (T.RewardsOn == nil) and true or T.RewardsOn.Value
+        SB.upgradesOn = (T.UpgradesOn == nil) and true or T.UpgradesOn.Value
     end
-    SB.Jobs.Start(); SB.Treadmill.Start(); SB.Ascension.Start(); SB.Quests.Start(); SB.Rewards.Start()
+    SB.Jobs.Start(); SB.Treadmill.Start(); SB.Ascension.Start(); SB.Quests.Start(); SB.Rewards.Start(); SB.Upgrades.Start()
 
     -- READ INICIAL + REFRESH (StateStore). Fuentes reales confirmadas live:
     --   GetCurrencySnapshot { points(money), speed(stat velocidad = techo budget), safeMode }

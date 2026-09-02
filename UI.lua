@@ -88,6 +88,9 @@ return function(require, SB, Lib)
         econ:AddToggle("RewardsOn", { Text = "Auto-Rewards (PlayTime)", Default = true,
             Tooltip = "Claim PlayTime rewards al desbloquearse. FreeRewards NO (requiere like/group).",
             Callback = function(v) SB.rewardsOn = v end })
+        econ:AddToggle("UpgradesOn", { Text = "Auto-Upgrades", Default = true,
+            Tooltip = "Compra upgrades asequibles (Speed/Points) — drena points en boosts. Sin zona.",
+            Callback = function(v) SB.upgradesOn = v end })
     end
 
     return UI
