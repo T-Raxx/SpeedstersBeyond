@@ -23,6 +23,7 @@ return function(require, SB, _Lib)
     SB.Jobs = require("Jobs.Jobs")
     SB.Treadmill = require("Treadmill.Treadmill")
     SB.Ascension = require("Ascension.Ascension")
+    SB.Quests = require("Economy.Quests")
 
     local Window = Library:CreateWindow({
         Title = "SpeedstersBeyond",
@@ -70,8 +71,9 @@ return function(require, SB, _Lib)
         SB.treadmillPad = O.TreadmillPad and O.TreadmillPad.Value or "auto"
         SB.ascendAuto = T.AscendAuto and T.AscendAuto.Value
         SB.ascendTarget = O.AscendTarget and O.AscendTarget.Value or 0
+        SB.questsOn = (T.QuestsOn == nil) and true or T.QuestsOn.Value
     end
-    SB.Jobs.Start(); SB.Treadmill.Start(); SB.Ascension.Start()
+    SB.Jobs.Start(); SB.Treadmill.Start(); SB.Ascension.Start(); SB.Quests.Start()
 
     -- READ INICIAL + REFRESH (StateStore). Fuentes reales confirmadas live:
     --   GetCurrencySnapshot { points(money), speed(stat velocidad = techo budget), safeMode }

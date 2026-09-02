@@ -80,6 +80,11 @@ return function(require, SB, Lib)
         farm:AddButton({ Text = "Ascend Now (test)", Func = function()
             if SB.Ascension then task.spawn(SB.Ascension.AscendNow) end
         end })
+
+        local econ = SB.Tabs.Main:AddRightGroupbox("Economy")
+        econ:AddToggle("QuestsOn", { Text = "Auto-Quests", Default = true,
+            Tooltip = "Colecta quests completadas (sin zona, en paralelo al farm).",
+            Callback = function(v) SB.questsOn = v end })
     end
 
     return UI
