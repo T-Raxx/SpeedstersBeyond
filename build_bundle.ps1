@@ -18,6 +18,9 @@ $ORDER += @("UI.lua", "main.lua")
 
 $sb = New-Object System.Text.StringBuilder
 [void]$sb.Append("-- SpeedstersBeyond bundle self-contained. No editar a mano (generado por build_bundle.ps1).`n")
+# capturar el require REAL de Roblox ANTES de definir el shim → factories pueden requerir
+# ModuleScripts del juego (piggyback) pasando la Instance; el shim delega a este.
+[void]$sb.Append("local __rawRequire = require`n")
 [void]$sb.Append("local _MODS = {}`n")
 
 foreach ($rel in $ORDER) {
@@ -35,6 +38,9 @@ foreach ($rel in $ORDER) {
 local _cache = {}
 local SB
 local function require(name)
+    -- Instance → ModuleScript del juego (piggyback): delega al require real de Roblox (devuelve
+    -- la tabla CACHEADA que el juego ya usa). String → uno de nuestros factories.
+    if typeof(name) == "Instance" then return __rawRequire(name) end
     if _cache[name] then return _cache[name] end
     local factory = _MODS[name]
     if not factory then error("[SB] modulo no encontrado: " .. tostring(name)) end
