@@ -75,6 +75,9 @@ return function(require, SB, Lib)
             Rounding = 2, Suffix = "s",
             Tooltip = "Delay entre spams del botón (el spam es seguro). Bajo = llena slots + detecta lleno más rápido.",
             Callback = function(v) SB.jobsSelectDelay = v end })
+        farm:AddToggle("CollectJobPoints", { Text = "Collect Job Points", Default = true,
+            Tooltip = "Reclama el banco (botón 'Job Finished X') al llegar a Claim at. Off = acumula, claim manual.",
+            Callback = function(v) SB.collectJobPoints = v end })
         farm:AddDropdown("TreadmillPad", { Values = { "auto", "x2", "x3", "x4", "x6", "x10" }, Default = "auto",
             Text = "Treadmill pad", Callback = function(v) SB.treadmillPad = v end })
         farm:AddToggle("AscendAuto", { Text = "Auto-Ascend", Default = true,

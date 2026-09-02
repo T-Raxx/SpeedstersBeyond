@@ -95,7 +95,7 @@ return function(require, SB, Lib)
         -- Si YA hay legs (chain en progreso, tiers "In Progress" locked) → saltar accept y correrlos.
         if jc:GetLegCount() == 0 then
             if not gotoZone() then return "no-zone" end
-            if jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then fire(claimButton()); task.wait(1) end
+            if SB.collectJobPoints and jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then fire(claimButton()); task.wait(1) end
             Jobs.SetType(SB.jobsType or "Simple")
             local btn = tierButton(Jobs.BestTier())
             if not btn then return "tier-locked" end
@@ -117,7 +117,7 @@ return function(require, SB, Lib)
             task.wait(0.15)   -- banca + próximo leg (snappy; FPS drops OK)
             guard = guard + 1
         end
-        if jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then gotoZone(); fire(claimButton()); task.wait(1) end
+        if SB.collectJobPoints and jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then gotoZone(); fire(claimButton()); task.wait(1) end
         return "cycle-done"
     end
 
@@ -127,7 +127,9 @@ return function(require, SB, Lib)
         task.spawn(function()
             while running and not SB.IsStopped() do
                 if SB.masterOn and SB.jobsOn and not SB.ascending then
+                    SB.jobsActive = true                    -- exclusión: Treadmill no se mueve mientras hay job en curso
                     local ok, err = pcall(Jobs.RunCycle)
+                    SB.jobsActive = false                   -- limpia siempre (aun si RunCycle erroró)
                     if not ok then SB.Log(1, "Jobs cycle err:", err) end
                 else
                     task.wait(0.2)

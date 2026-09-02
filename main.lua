@@ -71,6 +71,7 @@ return function(require, SB, _Lib)
         SB.jobsType = O.JobsType and O.JobsType.Value or "Simple"
         SB.jobsClaimAt = O.JobsClaimAt and O.JobsClaimAt.Value or 40
         SB.jobsSelectDelay = O.JobsSelectDelay and O.JobsSelectDelay.Value or 0.05
+        SB.collectJobPoints = (T.CollectJobPoints == nil) and true or T.CollectJobPoints.Value
         SB.treadmillPad = O.TreadmillPad and O.TreadmillPad.Value or "auto"
         SB.ascendAuto = T.AscendAuto and T.AscendAuto.Value
         SB.ascendTarget = O.AscendTarget and O.AscendTarget.Value or 0

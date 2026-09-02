@@ -37,7 +37,8 @@ return function(require, SB, Lib)
         running = true
         task.spawn(function()
             while running and not SB.IsStopped() do
-                if SB.masterOn and SB.treadmillOn and not SB.ascending then
+                -- espera a que Jobs termine su chain (SB.jobsActive) antes de moverse → sin pelea de tweens
+                if SB.masterOn and SB.treadmillOn and not SB.ascending and not SB.jobsActive then
                     local name, pos = Treadmill.BestPad()
                     if pos then
                         local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")

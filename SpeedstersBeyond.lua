@@ -373,7 +373,7 @@ return function(require, SB, Lib)
         -- Si YA hay legs (chain en progreso, tiers "In Progress" locked) → saltar accept y correrlos.
         if jc:GetLegCount() == 0 then
             if not gotoZone() then return "no-zone" end
-            if jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then fire(claimButton()); task.wait(1) end
+            if SB.collectJobPoints and jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then fire(claimButton()); task.wait(1) end
             Jobs.SetType(SB.jobsType or "Simple")
             local btn = tierButton(Jobs.BestTier())
             if not btn then return "tier-locked" end
@@ -395,7 +395,7 @@ return function(require, SB, Lib)
             task.wait(0.15)   -- banca + próximo leg (snappy; FPS drops OK)
             guard = guard + 1
         end
-        if jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then gotoZone(); fire(claimButton()); task.wait(1) end
+        if SB.collectJobPoints and jc:GetBankedCount() >= (SB.jobsClaimAt or 40) then gotoZone(); fire(claimButton()); task.wait(1) end
         return "cycle-done"
     end
 
@@ -405,7 +405,9 @@ return function(require, SB, Lib)
         task.spawn(function()
             while running and not SB.IsStopped() do
                 if SB.masterOn and SB.jobsOn and not SB.ascending then
+                    SB.jobsActive = true                    -- exclusión: Treadmill no se mueve mientras hay job en curso
                     local ok, err = pcall(Jobs.RunCycle)
+                    SB.jobsActive = false                   -- limpia siempre (aun si RunCycle erroró)
                     if not ok then SB.Log(1, "Jobs cycle err:", err) end
                 else
                     task.wait(0.2)
@@ -462,7 +464,8 @@ return function(require, SB, Lib)
         running = true
         task.spawn(function()
             while running and not SB.IsStopped() do
-                if SB.masterOn and SB.treadmillOn and not SB.ascending then
+                -- espera a que Jobs termine su chain (SB.jobsActive) antes de moverse → sin pelea de tweens
+                if SB.masterOn and SB.treadmillOn and not SB.ascending and not SB.jobsActive then
                     local name, pos = Treadmill.BestPad()
                     if pos then
                         local hrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
@@ -836,6 +839,9 @@ return function(require, SB, Lib)
             Rounding = 2, Suffix = "s",
             Tooltip = "Delay entre spams del botón (el spam es seguro). Bajo = llena slots + detecta lleno más rápido.",
             Callback = function(v) SB.jobsSelectDelay = v end })
+        farm:AddToggle("CollectJobPoints", { Text = "Collect Job Points", Default = true,
+            Tooltip = "Reclama el banco (botón 'Job Finished X') al llegar a Claim at. Off = acumula, claim manual.",
+            Callback = function(v) SB.collectJobPoints = v end })
         farm:AddDropdown("TreadmillPad", { Values = { "auto", "x2", "x3", "x4", "x6", "x10" }, Default = "auto",
             Text = "Treadmill pad", Callback = function(v) SB.treadmillPad = v end })
         farm:AddToggle("AscendAuto", { Text = "Auto-Ascend", Default = true,
@@ -936,6 +942,7 @@ return function(require, SB, _Lib)
         SB.jobsType = O.JobsType and O.JobsType.Value or "Simple"
         SB.jobsClaimAt = O.JobsClaimAt and O.JobsClaimAt.Value or 40
         SB.jobsSelectDelay = O.JobsSelectDelay and O.JobsSelectDelay.Value or 0.05
+        SB.collectJobPoints = (T.CollectJobPoints == nil) and true or T.CollectJobPoints.Value
         SB.treadmillPad = O.TreadmillPad and O.TreadmillPad.Value or "auto"
         SB.ascendAuto = T.AscendAuto and T.AscendAuto.Value
         SB.ascendTarget = O.AscendTarget and O.AscendTarget.Value or 0
