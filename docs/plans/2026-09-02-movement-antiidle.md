@@ -13,8 +13,8 @@
 ## Global Constraints
 
 - **CFrame writes prohibidos** para traslado (no efecto real). Movimiento = LinearVelocity.
-- WalkSpeed server = 430 (speedCap tier). **Máx alcanzable con scripts ~500 sps** → budget ceiling hard `460`.
-- AC behavioral laxo (NoCheatPlus-2012-style): velocity sostenido bajo ceiling = OK, sin necesidad de pulso salvo tramos largos.
+- **Techo AC ESCALA con ascends** (~1.4x el speed stat; ej. 9k speed → ~13k techo). NO clamp fijo: `ceiling = speedStat * 1.35`, `budget = speedStat * mult`, con fluctuación. Modo `steady` para fragile jobs (control fino, no chocar props) vs `fast` (fluctúa alto, simple jobs).
+- AC behavioral laxo (NoCheatPlus-2012-style): velocity sostenido bajo ceiling = OK; se permite fluctuar, no hace falta cap estricto.
 - `SUSPICIOUS_IDLE=60` → gaps de input anti-idle aleatorios 25–45s.
 - Todo hereda las constraints del Plan Foundation (global SB, Governor, dryRun, kill-switch).
 
@@ -260,7 +260,7 @@ git commit -m "feat(antiidle): input sintético VIM vs SUSPICIOUS_IDLE"
 **Files:** Modify `UI.lua`, `main.lua`.
 
 **Interfaces:**
-- Produces: groupbox "Movement" (Toggle `PulseMode`, Slider `MoveBudget` 100–460, Slider `ArriveRadius` 4–20), groupbox "Anti-Idle" (Toggle `AntiIdleOn` default true, Slider `IdleGapMin` 15–40, Slider `IdleGapMax` 30–55). AntiIdle arranca/para con el toggle + master.
+- Produces: groupbox "Movement" (Dropdown `MoveMode` fast/steady → `SB.moveMode`, Slider `MoveBudgetMult` 0.8–1.35 → `SB.moveBudgetMult`, Slider `ArriveRadius` 4–20 → `SB.arriveRadius`), groupbox "Anti-Idle" (Toggle `AntiIdleOn` default true, Slider `IdleGapMin` 15–40, Slider `IdleGapMax` 30–55). AntiIdle arranca/para con el toggle; valores iniciales aplicados en main tras `LoadAutoloadConfig`.
 
 - [ ] **Step 1: Probe (rojo)**
 ```lua
@@ -272,17 +272,19 @@ Expected: `"false"`.
 - [ ] **Step 2: Modificar `UI.lua`** — añadir al final de `UI.build`, antes del `end` de la función:
 ```lua
         local mv = SB.Tabs.Main:AddRightGroupbox("Movement")
-        mv:AddToggle("PulseMode", { Text = "Pulse (tramos largos)", Default = false,
-            Tooltip = "Empuja a 1.5x budget. Innecesario si el sostenido no yankea.",
-            Callback = function(v) SB.pulseMode = v end })
-        mv:AddSlider("MoveBudget", { Text = "Budget override", Min = 100, Max = 460, Default = 445,
-            Rounding = 0, Suffix = " sps",
-            Tooltip = "0 = auto (speed stat +15). Fijo si querés capar manual." })
-        mv:AddSlider("ArriveRadius", { Text = "Arrive radius", Min = 4, Max = 20, Default = 8, Rounding = 0, Suffix = " st" })
+        mv:AddDropdown("MoveMode", { Values = { "fast", "steady" }, Default = "fast", Text = "Mode",
+            Tooltip = "fast = fluctúa alto (simple jobs). steady = controlado (fragile, no chocar props).",
+            Callback = function(v) SB.moveMode = v end })
+        mv:AddSlider("MoveBudgetMult", { Text = "Budget mult", Min = 0.8, Max = 1.35, Default = 1.2,
+            Rounding = 2, Suffix = "x",
+            Tooltip = "Fracción del speed stat. Techo AC ~1.35x (escala con ascends).",
+            Callback = function(v) SB.moveBudgetMult = v end })
+        mv:AddSlider("ArriveRadius", { Text = "Arrive radius", Min = 4, Max = 20, Default = 8,
+            Rounding = 0, Suffix = " st", Callback = function(v) SB.arriveRadius = v end })
 
         local ai = SB.Tabs.Main:AddRightGroupbox("Anti-Idle")
         ai:AddToggle("AntiIdleOn", { Text = "Anti-Idle", Default = true,
-            Tooltip = "Input sintético vs SUSPICIOUS_IDLE (60s).",
+            Tooltip = "Input sintético (VIM) vs SUSPICIOUS_IDLE (60s).",
             Callback = function(v)
                 SB.antiIdleOn = v
                 if v then SB.AntiIdle.Start() else SB.AntiIdle.Stop() end
@@ -306,13 +308,13 @@ Expected: `"false"`.
 ```lua
 local L = getgenv().SB.Library
 return table.concat({
-    tostring(L.Toggles.PulseMode ~= nil),
-    tostring(L.Options.MoveBudget ~= nil),
+    tostring(L.Options.MoveMode ~= nil),
+    tostring(L.Options.MoveBudgetMult ~= nil),
     tostring(L.Toggles.AntiIdleOn ~= nil),
     tostring(L.Options.IdleGapMin ~= nil),
 }, "|")
 ```
-Expected: `"true|true|true|true"`. UI muestra groupboxes Movement + Anti-Idle.
+Expected: `"true|true|true|true"`. UI muestra groupboxes Movement + Anti-Idle; `SB.moveMode`/`SB.moveBudgetMult` aplicados.
 
 - [ ] **Step 6: Commit**
 ```bash

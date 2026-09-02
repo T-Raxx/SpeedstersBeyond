@@ -44,6 +44,17 @@ return function(require, SB, _Lib)
     ThemeManager:ApplyToTab(cfgTab)
     SaveManager:LoadAutoloadConfig()
 
+    -- aplicar valores iniciales de flags de movimiento + arrancar AntiIdle si quedó on
+    do
+        local T, O = Library.Toggles, Library.Options
+        if O.MoveMode then SB.moveMode = O.MoveMode.Value end
+        if O.MoveBudgetMult then SB.moveBudgetMult = O.MoveBudgetMult.Value end
+        if O.ArriveRadius then SB.arriveRadius = O.ArriveRadius.Value end
+        if O.IdleGapMin then SB.AntiIdle.gapMin = O.IdleGapMin.Value end
+        if O.IdleGapMax then SB.AntiIdle.gapMax = O.IdleGapMax.Value end
+        if T.AntiIdleOn and T.AntiIdleOn.Value then SB.AntiIdle.Start() end
+    end
+
     -- READ INICIAL + REFRESH (StateStore). Fuentes reales confirmadas live:
     --   GetCurrencySnapshot { points(money), speed(stat velocidad = techo budget), safeMode }
     --   GetStatsSnapshot     { level, goal, exp }
