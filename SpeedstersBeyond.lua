@@ -115,15 +115,24 @@ end
 end)()
 _MODS["Movement.Movement"] = (function()
 -- Movement/Movement.lua — FACTORY. Travel via LinearVelocity constraint (CFrame writes NO sirven acá;
--- raw AssemblyLinearVelocity lo zeroea el control del humanoide). GoTo empuja HRP al target a budget
--- (clamp al ceiling), hugging al piso, con nudge anti-stuck. Verificado: cero snapback @200 sps.
+-- raw AssemblyLinearVelocity lo zeroea el control del humanoide). Verificado: cero snapback @200 sps.
+--
+-- BUDGET DINÁMICO: el techo del AC serverside ESCALA con ascends (~1.4x el speed stat; usuario: 9k→13k),
+-- así que NO clampeamos a un número fijo. techo = speedStat * HEADROOM, budget = speedStat * mult, con
+-- FLUCTUACIÓN (señal no-plana, y empuja alto en simple jobs). Modo "steady" (fragile jobs: velocidad
+-- controlada, desaceleración fuerte cerca del target para no chocar props) vs "fast" (default, fluctúa alto).
 return function(require, SB, Lib)
     local Players = game:GetService("Players")
     local RunService = game:GetService("RunService")
     local LP = Players.LocalPlayer
     local Move = {}
 
-    local CEIL = 460   -- techo hard (máx script ~500, margen de seguridad)
+    local HEADROOM = 1.35   -- techo relativo al speed stat (escala con ascends; ~9k→13k≈1.44 → 1.35 margen)
+    local FLOOR = 30
+
+    -- PRNG para fluctuación (Math.random puede estar bloqueado)
+    local rng = 20260902
+    local function rnd() rng = (rng * 1103515245 + 12345) % 2147483648; return rng / 2147483648 end
 
     local att, lv
     local function ensureMover(hrp)
@@ -146,9 +155,11 @@ return function(require, SB, Lib)
     Move.Clear = clearMover
     SB.onCleanup(clearMover)
 
+    local function base() return SB.Get("speed") or SB.Get("speedCapMax") or 200 end
+    function Move.Ceiling() return base() * HEADROOM end
     function Move.Budget()
-        local live = SB.Get("speed") or SB.Get("speedCapMax") or 200
-        return math.clamp(live + 15, 30, CEIL)
+        if SB.moveMode == "steady" then return math.clamp(base() * 0.92, FLOOR, Move.Ceiling()) end
+        return math.clamp(base() * (SB.moveBudgetMult or 1.2), FLOOR, Move.Ceiling())
     end
 
     local function hrpNow()
@@ -161,11 +172,13 @@ return function(require, SB, Lib)
     end
 
     -- GoTo bloqueante. Correr dentro de task.spawn si no querés bloquear.
+    -- opts: { arrive=8, budget=nil, mode=nil("fast"|"steady"), timeout=20, stuckSeconds=2.5 }
     function Move.GoTo(pos, opts)
         opts = opts or {}
         local arrive = opts.arrive or 8
         local timeout = opts.timeout or 20
         local stuckSec = opts.stuckSeconds or 2.5
+        local mode = opts.mode or SB.moveMode or "fast"
         local t0 = os.clock()
         local lastPos, stuckT = nil, os.clock()
         while not SB.IsStopped() do
@@ -180,7 +193,12 @@ return function(require, SB, Lib)
                 local dist = flat.Magnitude
                 if dist <= arrive then lv.VectorVelocity = Vector3.zero; return "arrived" end
                 local budget = opts.budget or Move.Budget()
-                if opts.pulse then budget = math.min(budget * 1.5, CEIL) end
+                local ceil = Move.Ceiling()
+                if mode ~= "steady" then
+                    budget = math.min(budget * (0.9 + rnd() * 0.25), ceil)   -- fluctuación (no-plana, empuja alto)
+                end
+                local slow = (mode == "steady") and 40 or 22                 -- desaceleración cerca del target
+                if dist < slow then budget = math.max(FLOOR, budget * math.clamp(dist / slow, 0.35, 1)) end
                 local dir = flat.Unit
                 lv.VectorVelocity = Vector3.new(dir.X * budget, -20, dir.Z * budget)  -- -20 = ground hug
                 if lastPos and (here - lastPos).Magnitude < 2 then
