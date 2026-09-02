@@ -77,6 +77,9 @@ return function(require, SB, Lib)
             Callback = function(v) SB.ascendAuto = v end })
         farm:AddSlider("AscendTarget", { Text = "Ascend target (0=inf)", Min = 0, Max = 200, Default = 0,
             Rounding = 0, Callback = function(v) SB.ascendTarget = v end })
+        farm:AddButton({ Text = "Ascend Now (test)", Func = function()
+            if SB.Ascension then task.spawn(SB.Ascension.AscendNow) end
+        end })
     end
 
     return UI
