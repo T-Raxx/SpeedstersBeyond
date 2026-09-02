@@ -158,6 +158,44 @@ return function(require, SB, Lib)
 end
 
 end)()
+_MODS["UI"] = (function()
+-- UI.lua — FACTORY. Construye tabs/groupboxes Obsidian + controles globales.
+-- Flags en Lib.Toggles / Lib.Options. Sin lógica de farm (solo wiring).
+return function(require, SB, Lib)
+    local UI = {}
+
+    function UI.build(Window, Library)
+        local box = SB.Tabs.Main:AddLeftGroupbox("Global")
+
+        box:AddToggle("MasterEnable", {
+            Text = "Master Enable", Default = false,
+            Tooltip = "Habilita el suite. Off = todo pausado (kill-switch suave).",
+            Callback = function(v) SB.masterOn = v end,
+        })
+        box:AddToggle("DryRun", {
+            Text = "Dry-Run", Default = false,
+            Tooltip = "Loguea writes en vez de dispararlos.",
+            Callback = function(v) SB.dryRun = v end,
+        })
+        box:AddDropdown("LogLevel", {
+            Values = { "Silent", "Warn", "Info", "Debug" }, Default = "Info",
+            Text = "Log Level",
+            Callback = function(v)
+                SB.logLevel = ({ Silent = 0, Warn = 1, Info = 2, Debug = 3 })[v] or 2
+            end,
+        })
+        box:AddButton({ Text = "Unload", Func = function() SB.Unload() end })
+        box:AddDivider()
+        box:AddLabel("Panic Key"):AddKeyPicker("PanicKey", {
+            Default = "RightControl", Mode = "Toggle", Text = "Panic (unload)",
+            Callback = function() SB.Unload() end,
+        })
+    end
+
+    return UI
+end
+
+end)()
 _MODS["main"] = (function()
 -- main.lua — FACTORY driver. Place guard, bootstrap Obsidian, crea Window, init capas, panic/unload.
 return function(require, SB, _Lib)
@@ -188,6 +226,20 @@ return function(require, SB, _Lib)
     })
     SB.Window = Window
     SB.Tabs = { Main = Window:AddTab("Main", "home") }
+
+    SB.UI = require("UI")
+    SB.UI.build(Window, Library)
+    -- SaveManager / ThemeManager
+    ThemeManager:SetLibrary(Library)
+    SaveManager:SetLibrary(Library)
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetFolder("SpeedstersBeyond")
+    ThemeManager:SetFolder("SpeedstersBeyond")
+    local cfgTab = Window:AddTab("Config", "settings")
+    SB.Tabs.Config = cfgTab
+    SaveManager:BuildConfigSection(cfgTab)
+    ThemeManager:ApplyToTab(cfgTab)
+    SaveManager:LoadAutoloadConfig()
 
     SB.Log(2, "cargado — window listo")
     Library:Notify("SpeedstersBeyond cargado", 3)

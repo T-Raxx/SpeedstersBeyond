@@ -28,6 +28,20 @@ return function(require, SB, _Lib)
     SB.Window = Window
     SB.Tabs = { Main = Window:AddTab("Main", "home") }
 
+    SB.UI = require("UI")
+    SB.UI.build(Window, Library)
+    -- SaveManager / ThemeManager
+    ThemeManager:SetLibrary(Library)
+    SaveManager:SetLibrary(Library)
+    SaveManager:IgnoreThemeSettings()
+    SaveManager:SetFolder("SpeedstersBeyond")
+    ThemeManager:SetFolder("SpeedstersBeyond")
+    local cfgTab = Window:AddTab("Config", "settings")
+    SB.Tabs.Config = cfgTab
+    SaveManager:BuildConfigSection(cfgTab)
+    ThemeManager:ApplyToTab(cfgTab)
+    SaveManager:LoadAutoloadConfig()
+
     SB.Log(2, "cargado — window listo")
     Library:Notify("SpeedstersBeyond cargado", 3)
 end
