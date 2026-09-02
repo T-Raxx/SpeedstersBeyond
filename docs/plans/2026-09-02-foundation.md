@@ -488,8 +488,10 @@ git commit -m "feat(ui): shell Obsidian + controles globales + config/theme mana
 - Test: probe valores vivos en SB.store
 
 **Interfaces:**
-- Consumes: `SB.Net`, `SB.Subscribe`, remotes `CurrencyChanged`, `AscensionChanged`, RF `GetSpeedCap`, `GetAscensionSnapshot`.
-- Produces: `SB.store.currency`, `SB.store.ascensions`, `SB.store.speedCap` poblados y auto-refrescados. `SB.masterOn`. Loop stub en Heartbeat (respeta stopped/masterOn) para futuras tasks.
+- Consumes: `SB.Net`, `SB.Set`, remotes `CurrencyChanged`/`AscensionChanged`, RF `GetCurrencySnapshot`/`GetStatsSnapshot`/`GetAscensionSnapshot`/`GetSpeedCap`.
+- Produces: StateStore poblado y auto-refrescado (`points`, `speed`, `level`, `expGoal`, `ascensions`, `levelCap`, `speedCapTier`, `nextSpeedCap`, `speedCapMax`), `SB.RefreshState(force)`, `SB.masterOn`. Loop stub Heartbeat (respeta stopped/masterOn).
+
+**Formas reales (confirmadas live):** `GetCurrencySnapshot={points,speed,safeMode}` (`speed`=stat de velocidad = techo de budget de movimiento), `GetStatsSnapshot={level,goal,exp}`, `GetAscensionSnapshot={ascensions,levelCap,nextLevelCap,speedCap,nextSpeedCap}`, `GetSpeedCap={max,cap}`.
 
 - [ ] **Step 1: Probe (rojo)**
 ```lua
@@ -498,33 +500,44 @@ return tostring(SB and SB.Get and SB.Get("speedCap"))
 ```
 Expected: `"nil"`.
 
-- [ ] **Step 2: Wire en `main.lua`** (tras el bloque SaveManager, antes del Notify):
+- [ ] **Step 2: Wire en `main.lua`** (tras `SaveManager:LoadAutoloadConfig()`, antes del Notify):
 
 ```lua
-    -- READ INICIAL + LISTENERS (StateStore)
+    -- READ INICIAL + REFRESH (StateStore). Fuentes reales confirmadas live.
     do
         local Net = SB.Net
-        local cap = Net.Invoke("GetSpeedCap")
-        if cap ~= nil then SB.Set("speedCap", cap) end
-        local snap = Net.Invoke("GetAscensionSnapshot")
-        if type(snap) == "table" and snap.ascensions ~= nil then
-            SB.Set("ascensions", snap.ascensions)
-        end
-        Net.OnChanged("CurrencyChanged", function(v) SB.Set("currency", v) end)
-        Net.OnChanged("AscensionChanged", function(v)
-            if type(v) == "table" and v.ascensions ~= nil then SB.Set("ascensions", v.ascensions)
-            else SB.Set("ascensions", v) end
-        end)
-        -- refresco periódico del speed cap vivo (barato)
-        SB.track(game:GetService("RunService").Heartbeat:Connect(function()
-            if SB.IsStopped() then return end
-        end))
-        task.spawn(function()
-            while not SB.IsStopped() do
-                local c = Net.Invoke("GetSpeedCap")
-                if c ~= nil then SB.Set("speedCap", c) end
-                task.wait(2)
+        local RunService = game:GetService("RunService")
+        local lastRefresh = 0
+        local function refreshState(force)
+            local now = os.clock()
+            if not force and (now - lastRefresh) < 0.5 then return end   -- throttle anti-spam (CurrencyChanged)
+            lastRefresh = now
+            local cur = Net.Invoke("GetCurrencySnapshot")
+            if type(cur) == "table" then
+                if cur.points ~= nil then SB.Set("points", cur.points) end
+                if cur.speed  ~= nil then SB.Set("speed",  cur.speed)  end
             end
+            local st = Net.Invoke("GetStatsSnapshot")
+            if type(st) == "table" then
+                if st.level ~= nil then SB.Set("level", st.level) end
+                if st.goal  ~= nil then SB.Set("expGoal", st.goal) end
+            end
+            local asc = Net.Invoke("GetAscensionSnapshot")
+            if type(asc) == "table" then
+                if asc.ascensions   ~= nil then SB.Set("ascensions", asc.ascensions) end
+                if asc.levelCap     ~= nil then SB.Set("levelCap", asc.levelCap) end
+                if asc.speedCap     ~= nil then SB.Set("speedCapTier", asc.speedCap) end
+                if asc.nextSpeedCap ~= nil then SB.Set("nextSpeedCap", asc.nextSpeedCap) end
+            end
+            local sc = Net.Invoke("GetSpeedCap")
+            if type(sc) == "table" and sc.max ~= nil then SB.Set("speedCapMax", sc.max) end
+        end
+        SB.RefreshState = refreshState
+        refreshState(true)
+        Net.OnChanged("CurrencyChanged", function() refreshState() end)
+        Net.OnChanged("AscensionChanged", function() refreshState() end)
+        task.spawn(function()
+            while not SB.IsStopped() do refreshState(); task.wait(2) end
         end)
     end
 
@@ -535,30 +548,28 @@ Expected: `"nil"`.
     end))
 ```
 
-> Nota: las firmas exactas de `GetAscensionSnapshot`/`AscensionChanged`/`CurrencyChanged` se confirman con remote-spy en el Step 5; ajustar el parseo (`snap.ascensions`) a la forma real.
-
 - [ ] **Step 3: Build**
 Run: `powershell -ExecutionPolicy Bypass -File build_bundle.ps1`
 
-- [ ] **Step 4: Remote-spy baseline**
-Con `ensure-remote-spy` + `get-remote-spy-logs` (summaryOnly=false, filtros `CurrencyChanged`/`AscensionChanged`/`GetSpeedCap`), capturar la forma real de los payloads. Ajustar el parseo del Step 2 si difiere.
-
-- [ ] **Step 5: Load + Probe (verde)**
-Ejecutar bundle, esperar ~3s, luego:
+- [ ] **Step 4: Load + Probe (verde)**
+Ejecutar bundle, esperar ~1s, luego:
 ```lua
 local SB = getgenv().SB
 return table.concat({
-    "cap=" .. tostring(SB.Get("speedCap")),
+    "points=" .. tostring(SB.Get("points")),
+    "speed=" .. tostring(SB.Get("speed")),
+    "level=" .. tostring(SB.Get("level")),
     "asc=" .. tostring(SB.Get("ascensions")),
-    "cur=" .. tostring(SB.Get("currency")),
+    "levelCap=" .. tostring(SB.Get("levelCap")),
+    "speedCapMax=" .. tostring(SB.Get("speedCapMax")),
 }, "|")
 ```
-Expected: `speedCap` numérico no-nil; `ascensions` numérico; `currency` se puebla tras el primer `CurrencyChanged` (moverse/ganar in-game para gatillarlo).
+Expected: todos numéricos no-nil (ej. `points=9312|speed=410|level=137|asc=19|levelCap=238|speedCapMax=410`).
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 ```bash
 git add main.lua
-git commit -m "feat(state): StateStore listeners + read vivo (cap/ascensions/currency) + loop stub"
+git commit -m "feat(state): StateStore refresh + read vivo (points/speed/level/ascensions/caps) + loop stub"
 ```
 
 ---
