@@ -17,6 +17,7 @@ return function(require, SB, _Lib)
     SB.SaveManager  = SaveManager
 
     SB.Governor = require("Safety.Governor")
+    SB.Net = require("Net")
 
     local Window = Library:CreateWindow({
         Title = "SpeedstersBeyond",
