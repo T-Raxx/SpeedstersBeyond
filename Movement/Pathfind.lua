@@ -1,31 +1,31 @@
--- Movement/Pathfind.lua — FACTORY. A* custom sobre grid local para RODEAR árboles (fragile jobs).
--- Los árboles (WorldProps folders T_cx,cz, chunk=1000) rompen por contacto → volar NO sirve; hay que
--- esquivarlos a nivel de piso. Solo consulta los chunks del corredor start→goal (no los 22k árboles).
--- Min-heap para A* eficiente (FPS drops tolerados: uso propio).
+-- Movement/Pathfind.lua — FACTORY. A* custom que rodea TODO lo que obstruye (árboles, montañas, muros,
+-- edificios) para fragile jobs. Occupancy combinada:
+--   • ÁRBOLES: posiciones de tronco (WorldProps chunks T_cx,cz, chunk=1000) con radio → deja huecos para pasar.
+--   • TERRENO/MUROS/EDIFICIOS: raycast hacia abajo (EXCLUYE WorldProps para que la copa de árbol no
+--     sobre-bloquee) → bloquea celdas cuyo suelo se eleva > baseline+CLIMB_MAX (montaña/muro) o vacío.
+-- Min-heap A*, string-pull con LOS de grid. Retry con corredor ancho si no hay ruta. FPS drops tolerados.
 return function(require, SB, Lib)
+    local Players = game:GetService("Players")
+    local LP = Players.LocalPlayer
     local Pathfind = {}
     local CHUNK = 1000
-    local DEF_CELL = 14           -- grid (tree spacing ~18, hitbox ~7)
-    local DEF_OBST_R = 16         -- radio de bloqueo por árbol (hitbox*scale + player + margen)
-    local MARGIN = 170            -- ancho del corredor a cada lado de la línea directa
-    local MAX_CELLS = 60000
-    local ITER_CAP = 40000
+    local DEF_CELL = 15
+    local TREE_R = 18           -- radio de bloqueo por tronco de árbol (hitbox 7 * scale + player + margen)
+    local CLIMB_MAX = 22        -- altura sobre baseline que cuenta como obstáculo (montaña/muro)
+    local PROBE_UP, PROBE_DOWN = 300, 900
+    local MAX_CELLS = 8000
+    local ITER_CAP = 60000
 
-    -- ── min-heap (por prioridad f) ─────────────────────────────────────────────
+    -- ── min-heap (por f) ────────────────────────────────────────────────────────
     local function heapNew() return { n = 0 } end
     local function heapPush(h, item, pri)
         h.n = h.n + 1; h[h.n] = { item, pri }
         local i = h.n
-        while i > 1 do
-            local p = i // 2
-            if h[p][2] <= h[i][2] then break end
-            h[p], h[i] = h[i], h[p]; i = p
-        end
+        while i > 1 do local p = i // 2; if h[p][2] <= h[i][2] then break end; h[p], h[i] = h[i], h[p]; i = p end
     end
     local function heapPop(h)
         if h.n == 0 then return nil end
-        local top = h[1][1]
-        h[1] = h[h.n]; h[h.n] = nil; h.n = h.n - 1
+        local top = h[1][1]; h[1] = h[h.n]; h[h.n] = nil; h.n = h.n - 1
         local i = 1
         while true do
             local l, r, sm = i * 2, i * 2 + 1, i
@@ -37,8 +37,7 @@ return function(require, SB, Lib)
         return top
     end
 
-    -- árboles dentro del corredor (solo chunks tocados por la línea a→b)
-    local function corridorObstacles(a, b, margin)
+    local function corridorTrees(a, b, margin)
         local wp = workspace:FindFirstChild("WorldProps"); if not wp then return {} end
         local seen, obs = {}, {}
         local steps = math.max(1, math.ceil((b - a).Magnitude / 300))
@@ -55,9 +54,7 @@ return function(require, SB, Lib)
                         local pp = t:IsA("Model") and (t.PrimaryPart or t:FindFirstChildWhichIsA("BasePart"))
                         if pp then
                             local pos = pp.Position
-                            if pos.X >= minX and pos.X <= maxX and pos.Z >= minZ and pos.Z <= maxZ then
-                                obs[#obs + 1] = pos
-                            end
+                            if pos.X >= minX and pos.X <= maxX and pos.Z >= minZ and pos.Z <= maxZ then obs[#obs + 1] = pos end
                         end
                     end
                 end
@@ -66,47 +63,61 @@ return function(require, SB, Lib)
         return obs
     end
 
-    -- FindPath(a, b) → { Vector3 waypoints } (incluye b real) o {b} si corredor limpio o nil si sin ruta.
-    function Pathfind.FindPath(a, b, opts)
-        opts = opts or {}
-        local obs = corridorObstacles(a, b, MARGIN)
-        if #obs == 0 then return { b } end
-        local cell, obr = opts.cell or DEF_CELL, opts.obstacleR or DEF_OBST_R
-        local minX = math.min(a.X, b.X) - MARGIN
-        local minZ = math.min(a.Z, b.Z) - MARGIN
-        local maxX = math.max(a.X, b.X) + MARGIN
-        local maxZ = math.max(a.Z, b.Z) + MARGIN
+    local function solve(a, b, margin, cell)
+        local minX = math.min(a.X, b.X) - margin
+        local minZ = math.min(a.Z, b.Z) - margin
+        local maxX = math.max(a.X, b.X) + margin
+        local maxZ = math.max(a.Z, b.Z) + margin
         local cols = math.floor((maxX - minX) / cell) + 1
         local rows = math.floor((maxZ - minZ) / cell) + 1
         while cols * rows > MAX_CELLS do
-            cell = cell * 1.5
+            cell = cell * 1.4
             cols = math.floor((maxX - minX) / cell) + 1
             rows = math.floor((maxZ - minZ) / cell) + 1
         end
         local function idx(c, r) return c * rows + r end
-        -- occupancy
         local blocked = {}
-        local rad = math.ceil(obr / cell)
-        for _, o in ipairs(obs) do
+
+        -- TERRENO/MUROS/EDIFICIOS por raycast (excluye char + WorldProps → copas no sobre-bloquean)
+        local baseline = (a.Y + b.Y) * 0.5
+        local rp = RaycastParams.new()
+        rp.FilterType = Enum.RaycastFilterType.Exclude
+        local exclude = { LP.Character }
+        local wp = workspace:FindFirstChild("WorldProps"); if wp then exclude[#exclude + 1] = wp end
+        rp.FilterDescendantsInstances = exclude
+        rp.IgnoreWater = true
+        local DOWN = Vector3.new(0, -PROBE_DOWN, 0)
+        for c = 0, cols - 1 do
+            local wx = minX + (c + 0.5) * cell
+            for r = 0, rows - 1 do
+                local wz = minZ + (r + 0.5) * cell
+                local hit = workspace:Raycast(Vector3.new(wx, baseline + PROBE_UP, wz), DOWN, rp)
+                if (not hit) or (hit.Position.Y > baseline + CLIMB_MAX) then blocked[idx(c, r)] = true end
+            end
+        end
+
+        -- ÁRBOLES por tronco (radio → deja huecos entre árboles para pasar)
+        local rad = math.ceil(TREE_R / cell)
+        for _, o in ipairs(corridorTrees(a, b, margin)) do
             local c0 = math.floor((o.X - minX) / cell)
             local r0 = math.floor((o.Z - minZ) / cell)
             for c = c0 - rad, c0 + rad do
                 for r = r0 - rad, r0 + rad do
                     if c >= 0 and c < cols and r >= 0 and r < rows then
-                        local cx = minX + (c + 0.5) * cell
-                        local cz = minZ + (r + 0.5) * cell
-                        if (cx - o.X) ^ 2 + (cz - o.Z) ^ 2 <= obr * obr then blocked[idx(c, r)] = true end
+                        local cx, cz = minX + (c + 0.5) * cell, minZ + (r + 0.5) * cell
+                        if (cx - o.X) ^ 2 + (cz - o.Z) ^ 2 <= TREE_R * TREE_R then blocked[idx(c, r)] = true end
                     end
                 end
             end
         end
+
         local function clampCell(p)
             return math.clamp(math.floor((p.X - minX) / cell), 0, cols - 1),
                    math.clamp(math.floor((p.Z - minZ) / cell), 0, rows - 1)
         end
         local sc, sr = clampCell(a)
         local gc, gr = clampCell(b)
-        blocked[idx(sc, sr)] = nil; blocked[idx(gc, gr)] = nil   -- no bloquear extremos
+        blocked[idx(sc, sr)] = nil; blocked[idx(gc, gr)] = nil
         local goalIdx = idx(gc, gr)
         local function hcost(c, r)
             local dc, dr = math.abs(c - gc), math.abs(r - gr)
@@ -118,8 +129,7 @@ return function(require, SB, Lib)
         local DIRS = { {1,0},{-1,0},{0,1},{0,-1},{1,1},{1,-1},{-1,1},{-1,-1} }
         local iters, found = ITER_CAP, false
         while iters > 0 do
-            local cur = heapPop(open)
-            if not cur then break end
+            local cur = heapPop(open); if not cur then break end
             if cur == goalIdx then found = true; break end
             iters = iters - 1
             local cc, cr = cur // rows, cur % rows
@@ -140,7 +150,6 @@ return function(require, SB, Lib)
             end
         end
         if not found then return nil end
-        -- reconstruir + reducir a ~waypoints
         local path, k = {}, goalIdx
         while k do
             local c, r = k // rows, k % rows
@@ -148,9 +157,7 @@ return function(require, SB, Lib)
             k = came[k]
         end
         for i = 1, #path // 2 do path[i], path[#path - i + 1] = path[#path - i + 1], path[i] end
-        -- STRING-PULL con line-of-sight sobre el grid: mantener un waypoint solo si el segmento recto
-        -- desde el anchor cruzaría una celda bloqueada. Así cada segmento entre waypoints es libre de
-        -- árboles (el downsample naive podía cortar por encima de un árbol entre waypoints lejanos).
+        -- STRING-PULL con LOS de grid (cada segmento entre waypoints es libre)
         local function segClear(p1, p2)
             local steps = math.max(1, math.ceil((p2 - p1).Magnitude / (cell * 0.5)))
             for i = 0, steps do
@@ -164,12 +171,18 @@ return function(require, SB, Lib)
         local wps = { path[1] }
         local anchor = 1
         for i = 3, #path do
-            if not segClear(path[anchor], path[i]) then
-                wps[#wps + 1] = path[i - 1]; anchor = i - 1
-            end
+            if not segClear(path[anchor], path[i]) then wps[#wps + 1] = path[i - 1]; anchor = i - 1 end
         end
-        wps[#wps + 1] = b   -- goal real (no el centro de celda)
+        wps[#wps + 1] = b
         return wps
+    end
+
+    -- FindPath: intenta corredor normal, luego ancho si no hay ruta (montaña grande cruzando).
+    function Pathfind.FindPath(a, b, opts)
+        opts = opts or {}
+        return solve(a, b, opts.margin or 260, opts.cell or DEF_CELL)
+            or solve(a, b, 700, DEF_CELL)
+            or { b }   -- fallback: directo (mejor que nada; raro)
     end
 
     return Pathfind

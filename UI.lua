@@ -44,7 +44,7 @@ return function(require, SB, Lib)
             Rounding = 0, Suffix = " st", Callback = function(v) SB.arriveRadius = v end })
 
         local ai = SB.Tabs.Main:AddRightGroupbox("Anti-Idle")
-        ai:AddToggle("AntiIdleOn", { Text = "Anti-Idle", Default = true,
+        ai:AddToggle("AntiIdleOn", { Text = "Anti-Idle", Default = false,
             Tooltip = "Input sintético (VIM) vs SUSPICIOUS_IDLE (60s).",
             Callback = function(v)
                 SB.antiIdleOn = v
@@ -56,8 +56,8 @@ return function(require, SB, Lib)
             Suffix = " s", Callback = function(v) if SB.AntiIdle then SB.AntiIdle.gapMax = v end end })
 
         local farm = SB.Tabs.Main:AddLeftGroupbox("Farm")
-        farm:AddDropdown("FarmMode", { Values = { "Jobs", "Treadmill" }, Default = "Jobs", Text = "Mode",
-            Tooltip = "Jobs y Treadmill son exclusivos por posición.",
+        farm:AddDropdown("FarmMode", { Values = { "Off", "Jobs", "Treadmill" }, Default = "Off", Text = "Mode",
+            Tooltip = "Off = ningún farm de posición (podés usar solo ascend/economy). Jobs/Treadmill exclusivos.",
             Callback = function(v)
                 SB.farmMode = v
                 SB.jobsOn = (v == "Jobs")
@@ -75,12 +75,12 @@ return function(require, SB, Lib)
             Rounding = 2, Suffix = "s",
             Tooltip = "Delay entre spams del botón (el spam es seguro). Bajo = llena slots + detecta lleno más rápido.",
             Callback = function(v) SB.jobsSelectDelay = v end })
-        farm:AddToggle("CollectJobPoints", { Text = "Collect Job Points", Default = true,
+        farm:AddToggle("CollectJobPoints", { Text = "Collect Job Points", Default = false,
             Tooltip = "Reclama el banco (botón 'Job Finished X') al llegar a Claim at. Off = acumula, claim manual.",
             Callback = function(v) SB.collectJobPoints = v end })
         farm:AddDropdown("TreadmillPad", { Values = { "auto", "x2", "x3", "x4", "x6", "x10" }, Default = "auto",
             Text = "Treadmill pad", Callback = function(v) SB.treadmillPad = v end })
-        farm:AddToggle("AscendAuto", { Text = "Auto-Ascend", Default = true,
+        farm:AddToggle("AscendAuto", { Text = "Auto-Ascend", Default = false,
             Callback = function(v) SB.ascendAuto = v end })
         farm:AddSlider("AscendTarget", { Text = "Ascend target (0=inf)", Min = 0, Max = 200, Default = 0,
             Rounding = 0, Callback = function(v) SB.ascendTarget = v end })
@@ -89,13 +89,13 @@ return function(require, SB, Lib)
         end })
 
         local econ = SB.Tabs.Main:AddRightGroupbox("Economy")
-        econ:AddToggle("QuestsOn", { Text = "Auto-Quests", Default = true,
+        econ:AddToggle("QuestsOn", { Text = "Auto-Quests", Default = false,
             Tooltip = "Colecta quests completadas (sin zona, en paralelo al farm).",
             Callback = function(v) SB.questsOn = v end })
-        econ:AddToggle("RewardsOn", { Text = "Auto-Rewards (PlayTime)", Default = true,
+        econ:AddToggle("RewardsOn", { Text = "Auto-Rewards (PlayTime)", Default = false,
             Tooltip = "Claim PlayTime rewards al desbloquearse. FreeRewards NO (requiere like/group).",
             Callback = function(v) SB.rewardsOn = v end })
-        econ:AddToggle("UpgradesOn", { Text = "Auto-Upgrades", Default = true,
+        econ:AddToggle("UpgradesOn", { Text = "Auto-Upgrades", Default = false,
             Tooltip = "Compra upgrades asequibles (Speed/Points) — drena points en boosts. Sin zona.",
             Callback = function(v) SB.upgradesOn = v end })
     end

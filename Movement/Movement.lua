@@ -83,8 +83,9 @@ return function(require, SB, Lib)
                 if mode ~= "steady" then
                     budget = math.min(budget * (0.9 + rnd() * 0.25), ceil)   -- fluctuación (no-plana, empuja alto)
                 end
-                local slow = (mode == "steady") and 40 or 22                 -- desaceleración cerca del target
-                if dist < slow then budget = math.max(FLOOR, budget * math.clamp(dist / slow, 0.35, 1)) end
+                -- ANTI-OVERSHOOT: velocidad ∝ distancia al acercarse → frena y PARA en el target (a alta
+                -- velocidad, sin esto, pasa de largo el área de jobs / drop / waypoint por 8+ studs/frame).
+                budget = math.min(budget, math.max(FLOOR, dist * 4))
                 local dir = flat.Unit
                 -- Y: noFly = ground-hug (fragile, rodea props por A* — volar los rompe). Si no, VUELO a
                 -- altitud crucero (limpia terreno en rutas largas; el AC rubberbandea horizontal, no vertical).
