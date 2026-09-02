@@ -21,6 +21,7 @@ return function(require, SB, _Lib)
     SB.Move = require("Movement.Movement")
     SB.AntiIdle = require("AntiIdle.AntiIdle")
     SB.Jobs = require("Jobs.Jobs")
+    SB.Treadmill = require("Treadmill.Treadmill")
 
     local Window = Library:CreateWindow({
         Title = "SpeedstersBeyond",
