@@ -51,8 +51,10 @@ return function(require, SB, Lib)
         return c and c:FindFirstChild("HumanoidRootPart")
     end
 
+    -- Stop DESTRUYE el constraint (no solo zeroea): un LinearVelocity con MaxForce=huge y
+    -- VectorVelocity=0 PINEA la velocidad a 0 → el char queda atascado (ni el juego lo mueve).
     function Move.Stop()
-        if lv then lv.VectorVelocity = Vector3.zero end
+        clearMover()
     end
 
     -- GoTo bloqueante. Correr dentro de task.spawn si no querés bloquear.
@@ -75,7 +77,7 @@ return function(require, SB, Lib)
                 local here = hrp.Position
                 local flat = Vector3.new(pos.X - here.X, 0, pos.Z - here.Z)
                 local dist = flat.Magnitude
-                if dist <= arrive then lv.VectorVelocity = Vector3.zero; return "arrived" end
+                if dist <= arrive then clearMover(); return "arrived" end
                 local budget = opts.budget or Move.Budget()
                 local ceil = Move.Ceiling()
                 if mode ~= "steady" then
@@ -93,7 +95,7 @@ return function(require, SB, Lib)
                     end
                 else stuckT = os.clock() end
                 lastPos = here
-                if os.clock() - t0 > timeout then lv.VectorVelocity = Vector3.zero; return "timeout" end
+                if os.clock() - t0 > timeout then clearMover(); return "timeout" end
                 RunService.Heartbeat:Wait()
             end
         end
